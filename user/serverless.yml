@@ -1,0 +1,97 @@
+service: ton-challenge-user-api
+
+frameworkVersion: '2'
+
+variablesResolutionMode: 20210326
+configValidationMode: error
+
+plugins:
+  - serverless-dynamodb-local
+  - serverless-offline
+  - serverless-mocha-plugin
+
+custom:
+  serverless-offline:
+    httpPort: 3000
+  serverless-mocha-plugin:
+    preTestCommands: 
+      - bash startOffline.sh
+    postTestCommands:
+      - bash stopOffline.sh
+  dynamodb:
+    stages:
+      - dev
+    start:
+      region: localhost
+      migrate: true
+      port: 8000
+      inMemory: true
+      heapInitial: 200m
+      heapMax: 1g
+      convertEmptyValues: true
+    seed:
+      test:
+        sources:
+          - table: "${self:provider.stage}-user"
+            sources: [./fake-test-user.json]
+
+provider:
+  name: aws
+  runtime: nodejs12.x
+  lambdaHashingVersion: 20201221
+  region: sa-east-1
+  stage: dev
+  environment:
+    NODE_ENV: ${opt:stage, self:provider.stage}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource:
+            - Fn::GetAtt: [ userTable, Arn ]
+
+functions:
+  create:
+    description: Stores the log details
+    handler: api/controllers/create.handle
+    events:
+      - http:
+          path: /user
+          method: POST
+          request:
+            schemas:
+              application/json: ${file(schema.json)}
+    environment:
+      TABLE_NAME: "${self:provider.stage}-user"
+  get:
+    description: Stores the log details
+    handler: api/controllers/get.handle
+    events:
+      - http:
+          path: /user/{id}
+          method: GET
+    environment:
+      TABLE_NAME: "${self:provider.stage}-user"
+
+resources:
+  Resources:
+    userTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: "${self:provider.stage}-user"
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
