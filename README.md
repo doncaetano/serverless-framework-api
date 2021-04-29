@@ -1,2 +1,2 @@
-# serverless--framework-api
-Some small api using serverless framework.
+# serverless-framework-api
+Some small API's using serverless framework. It's possible to use them using the scripts provided at the package.json.
